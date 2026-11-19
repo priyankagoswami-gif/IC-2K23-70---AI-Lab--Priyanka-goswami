@@ -1,0 +1,163 @@
+% Crop-wise moisture requirements
+crop_limit(tomato, 40).
+crop_limit(wheat, 30).
+
+% Crop-wise irrigation thresholds
+moisture_threshold(tomato, 15, 25, 40).
+moisture_threshold(wheat, 10, 20, 30).
+
+% Validate user input
+valid_input(Crop, M, T, H, Rain) :-
+    member(Crop, [tomato, wheat]),
+    number(M), M >= 0, M =< 100,
+    number(T), T >= -10, T =< 60,
+    number(H), H >= 0, H =< 100,
+    member(Rain, [yes, no]).
+
+% Soil condition
+soil_condition(Crop, M, dry) :-
+    crop_limit(Crop, Limit),
+    M =< Limit.
+
+soil_condition(Crop, M, adequate) :-
+    crop_limit(Crop, Limit),
+    M > Limit.
+
+% Temperature condition
+temperature_condition(T, high) :-
+    T >= 35.
+
+temperature_condition(T, moderate) :-
+    T >= 25, T < 35.
+
+temperature_condition(T, low) :-
+    T < 25.
+
+% Humidity condition
+humidity_condition(H, low) :-
+    H =< 30.
+
+humidity_condition(H, normal) :-
+    H > 30.
+
+% RULE 1: Postpone irrigation if rainfall is expected
+decision(_, _, _, _, yes, postpone, no_irrigation,
+    'Rainfall is expected, so irrigation is postponed.').
+
+% RULE 2: No irrigation if moisture is sufficient
+decision(Crop, M, _, _, no, not_required, no_irrigation,
+    'Soil moisture is sufficient for this crop.') :-
+    crop_limit(Crop, Limit),
+    M > Limit.
+
+% RULE 3: High irrigation
+decision(Crop, M, T, H, no, required, high,
+    'Soil moisture is low, the temperature is high, and rainfall is not expected.') :-
+    moisture_threshold(Crop, High, _, _),
+    M =< High,
+    T >= 35.
+
+decision(Crop, M, _, H, no, required, high,
+    'Soil moisture is low, humidity is low, and rainfall is not expected.') :-
+    moisture_threshold(Crop, High, _, _),
+    M =< High,
+    H =< 30.
+
+% RULE 4: Medium irrigation
+decision(Crop, M, _, _, no, required, medium,
+    'Soil moisture is low and irrigation is required.') :-
+    moisture_threshold(Crop, High, Medium, _),
+    M > High,
+    M =< Medium.
+
+% RULE 5: Low irrigation
+decision(Crop, M, _, _, no, required, low,
+    'Soil moisture is slightly below the crop requirement.') :-
+    moisture_threshold(Crop, _, Medium, Maximum),
+    M > Medium,
+    M =< Maximum.
+
+% MAIN PROGRAM
+start :-
+    nl,
+    write('SMART IRRIGATION SYSTEM'), nl, nl,
+
+    write('Enter crop (tomato/wheat): '),
+    read(Crop),
+
+    write('Enter soil moisture (0-100): '),
+    read(M),
+
+    write('Enter temperature in Celsius: '),
+    read(T),
+
+    write('Enter humidity (0-100): '),
+    read(H),
+
+    write('Is rainfall expected? (yes/no): '),
+    read(Rain),
+
+    ( valid_input(Crop, M, T, H, Rain) ->
+
+        soil_condition(Crop, M, Soil),
+        temperature_condition(T, Temp),
+        humidity_condition(H, Hum),
+
+        decision(Crop, M, T, H, Rain, Action, Level, Reason),
+
+        ( Soil = dry -> SoilText = 'Dry'
+        ; SoilText = 'Adequate'
+        ),
+
+        ( Temp = high -> TempText = 'High'
+        ; Temp = moderate -> TempText = 'Moderate'
+        ; Temp = low -> TempText = 'Low'
+        ),
+
+        ( Hum = low -> HumText = 'Low'
+        ; HumText = 'Normal'
+        ),
+
+        ( Rain = yes -> RainText = 'Yes'
+        ; RainText = 'No'
+        ),
+
+        ( Action = required ->
+            ActionText = 'Irrigation Required'
+        ; Action = not_required ->
+            ActionText = 'No Irrigation Required'
+        ;
+            ActionText = 'Irrigation Postponed'
+        ),
+
+        ( Level = high -> LevelText = 'High'
+        ; Level = medium -> LevelText = 'Medium'
+        ; Level = low -> LevelText = 'Low'
+        ;
+            LevelText = 'No Irrigation'
+        ),
+
+        nl,
+        write('SMART IRRIGATION SYSTEM'), nl, nl,
+
+        format('Crop: ~w~n', [Crop]),
+        format('Soil Condition: ~w~n', [SoilText]),
+        format('Temperature: ~w~n', [TempText]),
+        format('Humidity: ~w~n', [HumText]),
+        format('Rainfall Expected: ~w~n', [RainText]),
+
+        nl,
+        format('Recommendation: ~w~n', [ActionText]),
+        format('Suggested Level: ~w~n', [LevelText]),
+
+        nl,
+        format('Reason: ~w~n', [Reason])
+
+    ;
+        nl,
+        write('Invalid input! Please enter valid values.'), nl
+    ).
+
+% Run the program
+run :-
+    start.
